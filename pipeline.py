@@ -81,6 +81,8 @@ def download_cda(url, dest):
     """
     page = subprocess.run(['curl', '-sL', *HEADER_ARGS, url],
                           capture_output=True, text=True).stdout
+    # player_data may be HTML-entity-encoded -- normalize &quot; back to "
+    page = page.replace('&quot;', '"')
     m = re.search(r'"manifest_cast":"(https:[^"]+?\.mpd)"', page)
     if not m:
         sys.exit('could not find "manifest_cast" on the cda.pl page '

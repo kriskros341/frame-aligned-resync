@@ -1,93 +1,84 @@
-# https://www.cda.pl/video/12650766f
 
-# if no first arg then read
+#!/bin/bash
+# cda_download.sh -- download a video from cda.pl and mux it into gotowy_film.mp4
+#
+# The DASH manifest URL is read straight off the video page (the
+# "manifest_cast" field in the player's player_data attribute).
+#
+# Usage:  ./cda_download.sh "https://www.cda.pl/video/XXXXXXXXX"
+# My testing example: https://www.cda.pl/video/12650766f
 
 if [ -z "$1" ]; then
-  read -p "Wklej adres URL pliku wideo (z F12): " video_url
+  read -p "Wklej adres URL strony wideo z cda.pl: " video_url
 else
   video_url="$1"
 fi
 
-# get last part of url after last slash
-filename="${video_url##*/}"
+# Browser headers that cda.pl expects
+HDRS=(
+  -H 'accept: */*'
+  -H 'accept-language: en-US,en;q=0.7'
+  -H 'origin: https://www.cda.pl'
+  -H 'referer: https://www.cda.pl/'
+  -H 'sec-ch-ua: "Chromium";v="148", "Brave";v="148", "Not/A)Brand";v="99"'
+  -H 'sec-ch-ua-mobile: ?0'
+  -H 'sec-ch-ua-platform: "Linux"'
+  -H 'sec-fetch-dest: empty'
+  -H 'sec-fetch-mode: cors'
+  -H 'sec-fetch-site: same-site'
+  -H 'sec-gpc: 1'
+  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36'
+)
 
-# sed f$ to .mpd
-file_url_scheme=$(echo "$filename" | sed 's/..$//')
+echo "[1/4] Pobieranie strony i odczyt manifestu DASH..."
+page=$(curl -sL "${HDRS[@]}" "$video_url")
 
-# echo "Audio info URL: $audio_info_url"
+# player_data may be HTML-entity-encoded -- turn &quot; back into "
+page=${page//&quot;/\"}
 
-# curl $audio_info_url
-echo "https://vwaw036.cda.pl/${file_url_scheme}raw/${file_url_scheme}.mpd"
-# results in https://vwaw036.cda.pl/1265076raw/1265076.mpd
+# Extract the "manifest_cast":"https:\/\/.../...mpd" field from player_data
+manifest_cast=$(echo "$page" | grep -oP '"manifest_cast":"\K[^"]+\.mpd' | head -n1)
+if [ -z "$manifest_cast" ]; then
+  echo "Blad: nie znaleziono \"manifest_cast\" na stronie."
+  echo "      Sprawdz adres URL (czy wideo jest publiczne?)."
+  exit 1
+fi
 
-xml_response=$(curl "https://vwaw036.cda.pl/${file_url_scheme}raw/${file_url_scheme}.mpd" \
-  -H 'accept: */*' \
-  -H 'accept-language: en-US,en;q=0.7' \
-  -H 'origin: https://www.cda.pl' \
-  -H 'priority: u=1, i' \
-  -H 'referer: https://www.cda.pl/' \
-  -H 'sec-ch-ua: "Chromium";v="148", "Brave";v="148", "Not/A)Brand";v="99"' \
-  -H 'sec-ch-ua-mobile: ?0' \
-  -H 'sec-ch-ua-platform: "Linux"' \
-  -H 'sec-fetch-dest: empty' \
-  -H 'sec-fetch-mode: cors' \
-  -H 'sec-fetch-site: same-site' \
-  -H 'sec-gpc: 1' \
-  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36')
+# Unescape JSON slashes  \/  ->  /
+mpd_url=$(echo "$manifest_cast" | sed 's/\\\//\//g')
+# Media base directory = manifest URL minus its last path segment
+base_url="${mpd_url%/*}/"
+echo "      Manifest: $mpd_url"
 
-# Wyciągnięcie nazwy pliku wideo (szuka linii z contentType="video" i bierze następny tag BaseURL)
+xml_response=$(curl -s "${HDRS[@]}" "$mpd_url")
+
+# Video filename: first <BaseURL> after contentType="video"
 video_file=$(echo "$xml_response" | awk '/contentType="video"/{flag=1} flag && /<BaseURL>/{gsub(/<\/?BaseURL>/,""); print $1; exit}')
 
-# Wyciągnięcie nazwy pliku audio (szuka linii z contentType="audio" i bierze następny tag BaseURL)
+# Audio filename: first <BaseURL> after contentType="audio"
 audio_file=$(echo "$xml_response" | awk '/contentType="audio"/{flag=1} flag && /<BaseURL>/{gsub(/<\/?BaseURL>/,""); print $1; exit}')
 
-# Usunięcie ewentualnych spacji/odstępów
+# Strip any stray whitespace
 video_file=$(echo "$video_file" | tr -d '[:space:]')
 audio_file=$(echo "$audio_file" | tr -d '[:space:]')
 
-echo "Wideo plik: $video_file"
-echo "Audio plik: $audio_file"
+if [ -z "$video_file" ] || [ -z "$audio_file" ]; then
+  echo "Blad: manifest nie zawiera strumieni wideo/audio."
+  exit 1
+fi
 
+echo "      Wideo plik: $video_file"
+echo "      Audio plik: $audio_file"
 
-video_url="https://vwaw036.cda.pl/${file_url_scheme}raw/${video_file}"
-audio_url="https://vwaw036.cda.pl/${file_url_scheme}raw/${audio_file}"
+echo "[2/4] Pobieranie pliku wideo: ${base_url}${video_file}"
+curl -L -o "temp_video.mp4" "${HDRS[@]}" "${base_url}${video_file}"
 
-echo ""
-echo "[1/3] Pobieranie pliku wideo z adresu: $video_url"
-curl -L -o "temp_video.mp4" "$video_url" \
-  -H 'accept: */*' \
-  -H 'accept-language: en-US,en;q=0.7' \
-  -H 'origin: https://www.cda.pl' \
-  -H 'priority: u=1, i' \
-  -H 'referer: https://www.cda.pl/' \
-  -H 'sec-ch-ua: "Chromium";v="148", "Brave";v="148", "Not/A)Brand";v="99"' \
-  -H 'sec-ch-ua-mobile: ?0' \
-  -H 'sec-ch-ua-platform: "Linux"' \
-  -H 'sec-fetch-dest: empty' \
-  -H 'sec-fetch-mode: cors' \
-  -H 'sec-fetch-site: same-site' \
-  -H 'sec-gpc: 1' \
-  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36'
+echo "[3/4] Pobieranie pliku audio: ${base_url}${audio_file}"
+curl -L -o "temp_audio.mp4" "${HDRS[@]}" "${base_url}${audio_file}"
 
-echo "[2/3] Pobieranie pliku audio z adresu: $audio_url"
-curl -L -o "temp_audio.mp4" "$audio_url" \
-  -H 'accept: */*' \
-  -H 'accept-language: en-US,en;q=0.7' \
-  -H 'origin: https://www.cda.pl' \
-  -H 'priority: u=1, i' \
-  -H 'referer: https://www.cda.pl/' \
-  -H 'sec-ch-ua: "Chromium";v="148", "Brave";v="148", "Not/A)Brand";v="99"' \
-  -H 'sec-ch-ua-mobile: ?0' \
-  -H 'sec-ch-ua-platform: "Linux"' \
-  -H 'sec-fetch-dest: empty' \
-  -H 'sec-fetch-mode: cors' \
-  -H 'sec-fetch-site: same-site' \
-  -H 'sec-gpc: 1' \
-  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36'
-
-echo "[3/3] Łączenie strumieni przez FFmpeg..."
+echo "[4/4] Laczenie strumieni przez FFmpeg..."
 ffmpeg -i "temp_video.mp4" -i "temp_audio.mp4" -c copy "gotowy_film.mp4" -y
 
 rm -f "temp_video.mp4" "temp_audio.mp4"
 
-# https://vwaw036.cda.pl/1265076raw/1265076.mpd
+echo "Gotowe -> gotowy_film.mp4"
