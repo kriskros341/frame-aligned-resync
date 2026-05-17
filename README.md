@@ -1,4 +1,4 @@
-# Dub transplanter
+# frame-aligned-resync
 
 Tools for putting a Polish dub (downloaded from [cda.pl](https://www.cda.pl)) onto a high-definition video (e.g. a BluRay), keeping the two perfectly
 in sync.
