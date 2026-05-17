@@ -1,0 +1,62 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #16181d;
+  color: #e6e6e6;
+}
+
+#app {
+  max-width: 40rem;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+}
+
+h1 {
+  margin-bottom: 0.2rem;
+  font-size: 1.6rem;
+}
+
+.sub {
+  margin-top: 0;
+  color: #9aa0aa;
+}
+
+label {
+  display: block;
+  margin: 1rem 0;
+}
+
+label span {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.9rem;
+  color: #9aa0aa;
+}
+
+button {
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  font-size: 1rem;
+  border: 0;
+  border-radius: 6px;
+  background: #4c7ef3;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #3a3f4b;
+  color: #777;
+  cursor: not-allowed;
+}
+
+#log {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  min-height: 4rem;
+  background: #0e1014;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  color: #b8c0cc;
+}
