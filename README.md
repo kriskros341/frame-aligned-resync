@@ -127,8 +127,4 @@ python3 compress_result.py episode_PL.mp4 episode_PL_small.mp4
 ## Caveats
 
 - Where the Polish broadcast genuinely lacks footage, the output is silent. This is intentional because there is literally no audio to place there.
-- `pipeline.py` reads the manifest URL straight off the cda.pl page (the
-  `manifest_cast` field in the player's `player_data`), so the media host is
-  never guessed. The standalone `cda_download.sh` still hard-codes the host
-  (`vwaw036.cda.pl`) and may need it updated per video.
 - Assumes the donor audio fits within the target's timeline (donor shorter or similar length). The mirror case (donor longer) is not handled.
